@@ -1,0 +1,136 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  firstName    String?  @map("first_name")
+  lastName     String?  @map("last_name")
+  currency     String   @default("NGN")
+  role         String   @default("USER")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  categories   Category[]
+  expenses     Expense[]
+  income    Income[]
+  budget    Budget[]
+  review       Review?
+
+
+
+  @@map("users")
+}
+
+model Category {
+  id        String       @id @default(cuid())
+  name      String
+  color     String       @default("#6366f1")
+  icon      String       @default("wallet")
+  type      CategoryType @default(EXPENSE)
+  userId    String       @map("user_id")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenses  Expense[]
+  income    Income[]
+  budget    Budget[]
+
+
+  @@unique([name, userId])
+  @@map("categories")
+}
+
+enum CategoryType {
+  EXPENSE
+  INCOME
+  BOTH
+}
+
+
+model Expense {
+  id            String        @id @default(cuid())
+  title         String
+  description   String?
+  amount        Decimal       @db.Decimal(12, 2)
+  date          DateTime
+  paymentMethod PaymentMethod @default(CARD) @map("payment_method")
+  notes         String?
+  userId        String        @map("user_id")
+  categoryId    String        @map("category_id")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id])
+
+  @@map("expenses") 
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+  MOBILE_MONEY
+  OTHER
+}
+
+
+model Income {
+  id            String        @id @default(cuid())
+  title         String
+  source        String?
+  amount        Decimal       @db.Decimal(12, 2)
+  date          DateTime
+  userId        String        @map("user_id")
+  categoryId    String?        @map("category_id")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id])
+
+
+  @@map("income") 
+}
+
+
+model Budget {
+  id            String        @id @default(cuid())
+  amount        Decimal       @db.Decimal(12, 2)
+  userId        String        @map("user_id")
+  period        String        @default("MONTHLY")
+  categoryId    String        @map("category_id")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id])
+
+  @@map("budgets")
+  @@unique([userId, categoryId, period])
+
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  comment   String
+  userId    String   @unique @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("reviews")
+}

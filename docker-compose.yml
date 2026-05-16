@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: flowledger-db
+    environment:
+      POSTGRES_USER: flowledger
+      POSTGRES_PASSWORD: flowledger123
+      POSTGRES_DB: flowledger
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: .
+    container_name: flowledger-backend
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: postgresql://flowledger:flowledger123@postgres:5432/flowledger
+      JWT_SECRET: change-this-in-production
+      JWT_EXPIRES_IN: 7d
+      PORT: 3001
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
