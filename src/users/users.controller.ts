@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { UsersService } from './users.service';
@@ -8,10 +8,9 @@ import { UsersService } from './users.service';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-
-@Get()
-@UseGuards(JwtAuthGuard, AdminGuard)
-findAll() {
-  return this.usersService.findAll()
-}
+  @Get()
+  @UseGuards(AdminGuard)
+  findAll() {
+    return this.usersService.findAll();
+  }
 }
