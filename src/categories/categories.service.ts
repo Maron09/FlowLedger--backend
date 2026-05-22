@@ -7,7 +7,7 @@ import { UpdateCategoryDto } from './dto/update.dto'
 export class CategoriesService {
     constructor(private readonly prisma: PrismaService) {}
 
-    async create(userId: string, dto: CreateCategoryDto) {
+    async create(userId: string, workspaceId: string, dto: CreateCategoryDto) {
         const exists = await this.prisma.category.findFirst({
             where: {name: dto.name, userId}
         })
@@ -15,7 +15,7 @@ export class CategoriesService {
         if (exists) throw new ConflictException('Category name already exists');
         
         return this.prisma.category.create({
-            data: { ...dto, userId }
+            data: { ...dto, userId, workspaceId }
         })
     }
 
@@ -28,10 +28,10 @@ export class CategoriesService {
         })
     }
 
-    async findAll(userId: string, type?: string) {
+    async findAll(workspaceId: string, type?: string) {
         return this.prisma.category.findMany({
             where: { 
-                userId,
+                workspaceId,
                 ...(type ? {type: type as any} : {}),
             },
             orderBy: { name: 'asc' },

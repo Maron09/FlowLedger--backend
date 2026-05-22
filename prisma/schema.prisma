@@ -8,23 +8,24 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  firstName    String?  @map("first_name")
-  lastName     String?  @map("last_name")
-  currency     String   @default("NGN")
-  role         String   @default("USER")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id              String   @id @default(cuid())
+  email           String   @unique
+  passwordHash    String   @map("password_hash")
+  firstName       String?  @map("first_name")
+  lastName        String?  @map("last_name")
+  currency        String   @default("NGN")
+  role            String   @default("USER")
+  lastWorkspaceId String?  @map("last_workspace_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
-  categories   Category[]
-  expenses     Expense[]
-  income    Income[]
-  budget    Budget[]
-  review       Review?
-
-
+  categories       Category[]
+  expenses         Expense[]
+  income           Income[]
+  budget           Budget[]
+  review           Review?
+  workspaces       Workspace[]
+  workspaceMembers WorkspaceMember[]
 
   @@map("users")
 }
@@ -36,10 +37,12 @@ model Category {
   icon      String       @default("wallet")
   type      CategoryType @default(EXPENSE)
   userId    String       @map("user_id")
+  workspaceId String      @map("workspace_id")
   createdAt DateTime     @default(now()) @map("created_at")
   updatedAt DateTime     @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
   expenses  Expense[]
   income    Income[]
   budget    Budget[]
@@ -65,6 +68,7 @@ model Expense {
   paymentMethod PaymentMethod @default(CARD) @map("payment_method")
   notes         String?
   userId        String        @map("user_id")
+  workspaceId String      @map("workspace_id")
   categoryId    String        @map("category_id")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
@@ -73,6 +77,7 @@ model Expense {
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   category Category @relation(fields: [categoryId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
 
   @@map("expenses") 
 }
@@ -93,6 +98,7 @@ model Income {
   amount        Decimal       @db.Decimal(12, 2)
   date          DateTime
   userId        String        @map("user_id")
+  workspaceId String      @map("workspace_id")
   categoryId    String?        @map("category_id")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
@@ -100,6 +106,7 @@ model Income {
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   category Category? @relation(fields: [categoryId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
 
 
   @@map("income") 
@@ -110,6 +117,7 @@ model Budget {
   id            String        @id @default(cuid())
   amount        Decimal       @db.Decimal(12, 2)
   userId        String        @map("user_id")
+  workspaceId String      @map("workspace_id")
   period        String        @default("MONTHLY")
   categoryId    String        @map("category_id")
   createdAt     DateTime      @default(now()) @map("created_at")
@@ -117,9 +125,10 @@ model Budget {
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   category Category @relation(fields: [categoryId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
 
   @@map("budgets")
-  @@unique([userId, categoryId, period])
+  @@unique([workspaceId, categoryId, period])
 
 }
 
@@ -133,4 +142,52 @@ model Review {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("reviews")
+}
+
+model Workspace {
+  id        String        @id @default(cuid())
+  name      String
+  type      WorkspaceType @default(PERSONAL)
+  ownerId   String        @map("owner_id")
+  currency  String        @default("NGN")
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+
+  owner      User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  members    WorkspaceMember[]
+  categories Category[]
+  expenses   Expense[]
+  income     Income[]
+  budgets    Budget[]
+
+  @@unique([name, ownerId])
+  @@map("workspaces")
+}
+
+enum WorkspaceType {
+  PERSONAL
+  BUSINESS
+}
+
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  workspaceId String        @map("workspace_id")
+  userId      String        @map("user_id")
+  role        WorkspaceRole @default(VIEWER)
+  joinedAt    DateTime      @default(now()) @map("joined_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@map("workspace_members")
+}
+
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
 }

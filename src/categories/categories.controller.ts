@@ -3,17 +3,19 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { CategoriesService } from './categories.service'
 import { CreateCategoryDto } from './dto/create-category.dto'
 import { UpdateCategoryDto } from './dto/update.dto'
+import { WorkspaceGuard } from '../workspaces/workspace.guard'
 
-@Controller('categories')
-@UseGuards(JwtAuthGuard)
+@Controller('w/:workspaceId/categories')
+@UseGuards(JwtAuthGuard, WorkspaceGuard)
 export class CategoriesController {
     constructor(private readonly categoriesService: CategoriesService) {}
 
 
     @Post()
     create(@Body() dto: CreateCategoryDto, @Request() req) {
-        return this.categoriesService.create(req.user.id, dto);
+        return this.categoriesService.create(req.user.id, req.workspace.id, dto);
     }
+
 
     @Patch(':id')
     update(@Param('id') id: string, @Body() dto: UpdateCategoryDto, @Request() req) {
@@ -21,8 +23,8 @@ export class CategoriesController {
     }
 
     @Get()
-    findAll(@Request() req, @Query('type') type?: string) {
-        return this.categoriesService.findAll(req.user.id, type);
+    findAll(@Request() req, @Param('workspaceId') workspaceId: string) {
+        return this.categoriesService.findAll(workspaceId);
     }
 
     @Get(':id')

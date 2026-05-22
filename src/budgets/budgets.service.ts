@@ -2,22 +2,23 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { PrismaService } from 'prisma/prisma.service';
 import { CreateBudgetDto } from './dto/create-budget.dto';
 
+
 @Injectable()
 export class BudgetsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async upsert(userId: string, dto: CreateBudgetDto) {
+  async upsert(userId: string, workspaceId: string, dto: CreateBudgetDto) {
     // Make sure the category belongs to the user
     const category = await this.prisma.category.findFirst({
-      where: { id: dto.categoryId, userId },
+      where: { id: dto.categoryId, workspaceId },
     });
 
     if (!category) throw new NotFoundException('Category not found');
 
     return this.prisma.budget.upsert({
       where: {
-        userId_categoryId_period: {
-          userId,
+        workspaceId_categoryId_period: {
+          workspaceId,
           categoryId: dto.categoryId,
           period: dto.period ?? 'MONTHLY',
         },
@@ -28,14 +29,15 @@ export class BudgetsService {
         categoryId: dto.categoryId,
         period: dto.period ?? 'MONTHLY',
         userId,
+        workspaceId,
       },
       include: { category: true },
     });
   }
 
-  async findAll(userId: string) {
+  async findAll(workspaceId: string) {
     return this.prisma.budget.findMany({
-      where: { userId },
+      where: { workspaceId },
       include: { category: true },
     });
   }

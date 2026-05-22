@@ -2,21 +2,22 @@ import { Controller, Post, Get, Delete, UseGuards, Request, Param, Body } from '
 import { BudgetsService } from './budgets.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { CreateBudgetDto } from './dto/create-budget.dto';
+import { WorkspaceGuard } from '../workspaces/workspace.guard'
 
 
-@Controller('budgets')
-@UseGuards(JwtAuthGuard)
+@Controller('w/:workspaceId/budgets')
+@UseGuards(JwtAuthGuard, WorkspaceGuard)
 export class BudgetsController {
     constructor(private readonly budgetsService: BudgetsService) {}
     
     @Post()
     upsert(@Body() dto: CreateBudgetDto, @Request() req) {
-        return this.budgetsService.upsert(req.user.id, dto);
+        return this.budgetsService.upsert(req.user.id, req.workspace.id, dto);
     }
 
     @Get()
-    findAll(@Request() req) {
-        return this.budgetsService.findAll(req.user.id);
+    findAll(@Param('workspaceId') workspaceId: string, @Request() req) {
+        return this.budgetsService.findAll(workspaceId);
     }
 
     @Delete(':id')

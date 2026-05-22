@@ -8,20 +8,21 @@ import { UpdateIncomeDto } from './dto/update-income.dto'
 export class IncomeService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(userId: string, dto: CreateIncomeDto) {
+  async create(userId: string, workspaceId: string, dto: CreateIncomeDto) {
     return this.prisma.income.create({
       data: {
         ...dto,
         userId,
+        workspaceId,
         date: new Date(dto.date)
       },
     })
   }
 
-  async findAll(userId: string, query: QueryIncomeDto) {
+  async findAll(workspaceId: string, query: QueryIncomeDto) {
     const { page = 1, limit = 20, search, startDate, endDate, sortBy = 'date', sortOrder = 'desc' } = query;
 
-    const where: any = { userId }
+    const where: any = { workspaceId }
 
     if (search) {
       where.OR = [

@@ -4,15 +4,16 @@ import { IncomeService } from './income.service'
 import { CreateIncomeDto } from './dto/create-income.dto'
 import { QueryIncomeDto } from './dto/query-income.dto'
 import { UpdateIncomeDto } from './dto/update-income.dto'
+import { WorkspaceGuard } from '../workspaces/workspace.guard'
 
-@Controller('income')
-@UseGuards(JwtAuthGuard)
+@Controller('w/:workspaceId/income')
+@UseGuards(JwtAuthGuard, WorkspaceGuard)
 export class IncomeController {
     constructor(private readonly incomeService: IncomeService) {}
 
     @Post()
     create(@Body() dto: CreateIncomeDto, @Request() req) {
-        return this.incomeService.create(req.user.id, dto)
+        return this.incomeService.create(req.user.id, req.workspace.id, dto);
     }
 
     @Patch(':id')
@@ -21,8 +22,8 @@ export class IncomeController {
     }
 
     @Get()
-    findAll(@Query() query:QueryIncomeDto, @Request() req){
-        return this.incomeService.findAll(req.user.id, query)
+    findAll(@Query() query:QueryIncomeDto, @Param('workspaceId') workspaceId: string, @Request() req){
+        return this.incomeService.findAll(workspaceId, query)
     }
 
     @Get(':id')

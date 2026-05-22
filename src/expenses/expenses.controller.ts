@@ -5,15 +5,17 @@ import { ExpensesService } from './expenses.service'
 import { CreateExpenseDto } from './dto/create-expense.dto'
 import { QueryExpensesDto } from './dto/query-expense.dto'
 import { UpdateExpenseDto } from './dto/update-expense.dto'
+import { WorkspaceGuard } from '../workspaces/workspace.guard'
 
-@Controller('expenses')
-@UseGuards(JwtAuthGuard)
+
+@Controller('w/:workspaceId/expenses')
+@UseGuards(JwtAuthGuard, WorkspaceGuard)
 export class ExpensesController {
     constructor(private readonly expenseService: ExpensesService) {}
 
     @Post()
     create(@Body() dto: CreateExpenseDto, @Request() req) {
-        return this.expenseService.create(req.user.id, dto)
+        return this.expenseService.create(req.user.id, req.workspace.id, dto);
     }
 
     @Patch(':id')
@@ -22,8 +24,8 @@ export class ExpensesController {
     }
 
     @Get()
-    findAll(@Query() query:QueryExpensesDto, @Request() req){
-        return this.expenseService.findAll(req.user.id, query)
+    findAll(@Query() query:QueryExpensesDto,@Param('workspaceId') workspaceId: string, @Request() req){
+        return this.expenseService.findAll(workspaceId, query)
     }
 
     @Get(':id')

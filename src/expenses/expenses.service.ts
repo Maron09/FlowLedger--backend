@@ -8,52 +8,53 @@ import { QueryExpensesDto } from './dto/query-expense.dto';
 export class ExpensesService {
     constructor(private readonly prisma: PrismaService) {}
 
-    async create(userId: string, dto: CreateExpenseDto) {
+    async create(userId: string, workspaceId: string, dto: CreateExpenseDto) {
         return this.prisma.expense.create({
             data: {
                 ...dto,
                 userId,
+                workspaceId,
                 date: new Date(dto.date)
             },
             include: { category: true }
         })
     }
 
-    async findAll(userId: string, query: QueryExpensesDto) {
-        const { page = 1, limit = 20, search, categoryId, paymentMethod, startDate, endDate, sortBy = 'date', sortOrder = 'desc' } = query;
+    async findAll(workspaceId: string, query: QueryExpensesDto) {
+      const { page = 1, limit = 20, search, categoryId, paymentMethod, startDate, endDate, sortBy = 'date', sortOrder = 'desc' } = query;
 
-        const where: any = { userId };
+      const where: any = { workspaceId };
 
-        if (search) {
-            where.OR = [
-                { title: { contains: search, mode: 'insensitive' } },
-                { description: { contains: search, mode: 'insensitive' } }
-            ]
-        }
+      if (search) {
+        where.OR = [
+          { title: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+        ];
+      }
 
-        if (categoryId) where.categoryId = categoryId;
-        if (paymentMethod) where.paymentMethod = paymentMethod;
-        if (startDate || endDate) {
-            where.date = {};
-            if (startDate) where.date.gte = new Date(startDate);
-            if (endDate) where.date.lte = new Date(endDate);
-        }
+      if (categoryId) where.categoryId = categoryId;
+      if (paymentMethod) where.paymentMethod = paymentMethod;
+      if (startDate || endDate) {
+        where.date = {};
+        if (startDate) where.date.gte = new Date(startDate);
+        if (endDate) where.date.lte = new Date(endDate);
+      }
 
-        const [total, items] = await Promise.all([
-            this.prisma.expense.count({ where }),
-            this.prisma.expense.findMany({
-                where,
-                include: { category: true },
-                orderBy: { [sortBy]: sortOrder },
-                skip: (page - 1) * limit,
-                take: limit,
-            })
-        ])
+      const [total, items] = await Promise.all([
+        this.prisma.expense.count({ where }),
+        this.prisma.expense.findMany({
+          where,
+          include: { category: { select: { id: true, name: true, color: true, icon: true } } },
+          orderBy: { [sortBy]: sortOrder },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+      ]);
 
-        return {
-            items,
-            meta: { total, page, limit, totalPages: Math.ceil(total / limit) }
-        }
+      return {
+        items,
+        meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      };
     }
 
     async findOne(id: string, userId: string) {
