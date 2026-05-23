@@ -33,4 +33,15 @@ export class AuthController {
     resetPassword(@Body() dto: { token: string; password: string }) {
         return this.authService.resetPassword(dto.token, dto.password);
     }
+
+    @Post('refresh')
+    refresh(@Body() dto: { refreshToken: string }) {
+        return this.authService.refresh(dto.refreshToken);
+    }
+
+    @Post('logout')
+    @UseGuards(JwtAuthGuard)
+    logout(@Request() req) {
+        return this.authService.logout(req.user.id);
+    }
 }

@@ -7,6 +7,7 @@ import * as bcrypt from 'bcrypt';
 import { EmailService } from './email.service';
 import * as crypto from 'crypto';
 import { ConfigService } from '@nestjs/config';
+import { User } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -56,13 +57,11 @@ export class AuthService {
             throw new UnauthorizedException('Invalid email or password')
         }
 
-        const token = this.jwtService.sign({
-            sub: user.id,
-            email: user.email,
-        })
+        const { accessToken, refreshToken } = await this.generateTokens(user)
 
         return {
-            accessToken: token,
+            accessToken: accessToken,
+            refreshToken: refreshToken,
             user: {
                 id: user.id,
                 email: user.email,
@@ -120,5 +119,56 @@ export class AuthService {
         
         return { message: 'Password reset successful' };
 
+    }
+
+    async generateTokens(user: User) {
+        const payload = { sub: user.id, email: user.email };
+        const accessToken = this.jwtService.sign(payload);
+        const refreshToken = crypto.randomBytes(64).toString('hex');
+        const refreshTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        const refreshTokenHash = await bcrypt.hash(refreshToken, 10)
+
+        await this.prisma.user.update({
+            where: { id: user.id },
+            data: {
+                refreshToken: refreshTokenHash,
+                refreshTokenExpiry,
+            },
+        })
+
+        return { accessToken, refreshToken };
+    }
+
+    async refresh(refreshToken: string) {
+        const users = await this.prisma.user.findMany({
+            where: {
+                refreshToken: { not: null },
+                refreshTokenExpiry: { gt: new Date() },
+            }
+        })
+
+        let matchedUser: typeof users[0] | null = null;
+        for (const user of users) {
+            const valid = await bcrypt.compare(refreshToken, user.refreshToken!);
+            if (valid) {
+                matchedUser = user;
+                break;
+            }
+        }
+        if (!matchedUser) throw new UnauthorizedException('Invalid or expired refresh token');
+
+        return this.generateTokens(matchedUser);
+    }
+
+    async logout(userId: string) {
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+            refreshToken: null,
+            refreshTokenExpiry: null,
+            },
+        });
+
+        return { message: 'Logged out successfully' };
     }
 }
