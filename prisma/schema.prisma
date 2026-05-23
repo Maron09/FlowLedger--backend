@@ -26,6 +26,8 @@ model User {
   review           Review?
   workspaces       Workspace[]
   workspaceMembers WorkspaceMember[]
+  resetToken       String?  @map("reset_token")
+  resetTokenExpiry DateTime? @map("reset_token_expiry")
 
   @@map("users")
 }
