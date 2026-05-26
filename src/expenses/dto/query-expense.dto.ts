@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsInt, Min, Max, IsDateString, IsEnum, IsIn } from 'class-validator';
+import { IsOptional, IsString, IsInt, Min, Max, IsDateString, IsEnum, IsIn, IsBoolean } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { PaymentMethod } from '@prisma/client';
 
@@ -43,4 +43,9 @@ export class QueryExpensesDto {
   @IsOptional()
   @IsIn(['asc', 'desc'])
   sortOrder?: 'asc' | 'desc' = 'desc';
+
+  @IsOptional()
+  @Transform(({ value }) => value === 'true')
+  @IsBoolean()
+  isRecurring?: boolean;
 }

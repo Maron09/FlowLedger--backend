@@ -37,6 +37,8 @@ export class IncomeService {
       if (endDate) where.date.lte = new Date(endDate);
     }
 
+    if (query.isRecurring !== undefined) where.isRecurring = query.isRecurring;
+
     const [total, items] = await Promise.all([
       this.prisma.income.count({ where }),
       this.prisma.income.findMany({

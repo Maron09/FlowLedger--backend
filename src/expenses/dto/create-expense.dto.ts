@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsPositive, IsDateString, IsOptional, IsEnum, MaxLength } from 'class-validator';
+import { IsString, IsNumber, IsPositive, IsDateString, IsOptional, IsEnum, MaxLength, IsBoolean } from 'class-validator';
 import { PaymentMethod } from '@prisma/client';
 import { Transform } from 'class-transformer'
 
@@ -34,4 +34,8 @@ export class CreateExpenseDto {
     @IsString()
     @MaxLength(500)
     notes?: string;
+
+    @IsOptional()
+    @IsBoolean()
+    isRecurring?: boolean;
 }

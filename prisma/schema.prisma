@@ -76,6 +76,7 @@ model Expense {
   categoryId    String        @map("category_id")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
+  isRecurring   Boolean  @default(false) @map("is_recurring")
 
   
 
@@ -106,6 +107,7 @@ model Income {
   categoryId    String?        @map("category_id")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
+  isRecurring   Boolean  @default(false) @map("is_recurring")
 
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)

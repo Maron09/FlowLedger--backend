@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsPositive, IsDateString, IsOptional, IsEnum, MaxLength } from 'class-validator';
+import { IsString, IsNumber, IsPositive, IsDateString, IsOptional, IsBoolean, MaxLength } from 'class-validator';
 import { Transform } from 'class-transformer'
 
 
@@ -23,4 +23,8 @@ export class CreateIncomeDto {
     @IsString()
     @IsOptional()
     categoryId?: string;
+
+    @IsOptional()
+    @IsBoolean()
+    isRecurring?: boolean;
 }

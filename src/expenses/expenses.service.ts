@@ -39,6 +39,7 @@ export class ExpensesService {
         if (startDate) where.date.gte = new Date(startDate);
         if (endDate) where.date.lte = new Date(endDate);
       }
+      if (query.isRecurring !== undefined) where.isRecurring = query.isRecurring;
 
       const [total, items] = await Promise.all([
         this.prisma.expense.count({ where }),
