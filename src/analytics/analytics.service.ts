@@ -283,4 +283,96 @@ export class AnalyticsService {
 
     return insights
   }
+
+  async getTaxEstimate(workspaceId: string, workspace: any) {
+    const now = new Date()
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const { start, end } = this.getDateRange(thisMonth)
+
+    const incomeAgg = await this.prisma.income.aggregate({
+      where: { workspaceId, date: { gte: start, lte: end } },
+      _sum: { amount: true },
+    })
+
+    const monthlyIncome = Number(incomeAgg._sum.amount ?? 0)
+    const annualIncome = monthlyIncome * 12
+
+    if (workspace.type === 'PERSONAL') {
+      return this.calculatePersonalTax(monthlyIncome, annualIncome)
+    } else {
+      return this.calculateBusinessTax(monthlyIncome, annualIncome)
+    }
+  }
+
+  private calculatePersonalTax(monthlyIncome: number, annualIncome: number) {
+    // NTA 2025 bands (annual)
+    const bands = [
+      { limit: 800000, rate: 0 },
+      { limit: 2200000, rate: 0.15 },
+      { limit: 9000000, rate: 0.18 },
+      { limit: 13000000, rate: 0.21 },
+      { limit: 25000000, rate: 0.23 },
+      { limit: Infinity, rate: 0.25 },
+    ]
+
+    let taxableIncome = annualIncome
+    let totalTax = 0
+    let remaining = taxableIncome
+    const breakdown: { band: string; rate: number; tax: number }[] = []
+
+    for (const band of bands) {
+      if (remaining <= 0) break
+      const taxable = Math.min(remaining, band.limit)
+      const tax = taxable * band.rate
+      totalTax += tax
+      if (tax > 0) {
+        breakdown.push({
+          band: `₦${(taxableIncome - remaining + 1).toLocaleString()} - ₦${Math.min(taxableIncome, taxableIncome - remaining + band.limit).toLocaleString()}`,
+          rate: band.rate * 100,
+          tax,
+        })
+      }
+      remaining -= taxable
+    }
+
+    const effectiveRate = annualIncome > 0 ? (totalTax / annualIncome) * 100 : 0
+    const monthlyTax = totalTax / 12
+
+    return {
+      type: 'PERSONAL',
+      monthlyIncome,
+      annualIncome,
+      annualTax: totalTax,
+      monthlyTax,
+      effectiveRate,
+      breakdown,
+      note: annualIncome <= 800000
+        ? 'Your annual income is within the tax-free threshold of ₦800,000'
+        : `Based on NTA 2025 rates. Set aside ₦${Math.ceil(monthlyTax).toLocaleString()} monthly.`,
+    }
+  }
+
+  private calculateBusinessTax(monthlyIncome: number, annualIncome: number) {
+    // CIT: 20% for turnover < ₦100M, 30% for ₦100M+
+    const isSmall = annualIncome < 100_000_000
+    const citRate = isSmall ? 0.20 : 0.30
+    const annualTax = annualIncome * citRate
+    const monthlyTax = annualTax / 12
+
+    // VAT estimate: 7.5% on eligible transactions
+    const monthlyVat = monthlyIncome * 0.075
+
+    return {
+      type: 'BUSINESS',
+      monthlyIncome,
+      annualIncome,
+      citRate: citRate * 100,
+      annualTax,
+      monthlyTax,
+      monthlyVat,
+      effectiveRate: citRate * 100,
+      companySize: isSmall ? 'Small (under ₦100M turnover)' : 'Large (₦100M+ turnover)',
+      note: `CIT at ${citRate * 100}% + VAT at 7.5%. Set aside ₦${Math.ceil(monthlyTax + monthlyVat).toLocaleString()} monthly.`,
+    }
+  }
 }

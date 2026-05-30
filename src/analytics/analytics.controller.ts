@@ -32,4 +32,9 @@ export class AnalyticsController {
   getInsights(@Request() req) {
     return this.analyticsService.getInsights(req.workspace.id);
   }
+
+  @Get('tax')
+  getTaxEstimate(@Request() req) {
+    return this.analyticsService.getTaxEstimate(req.workspace.id, req.workspace);
+  }
 }
