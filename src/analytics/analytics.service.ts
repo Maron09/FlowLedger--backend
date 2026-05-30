@@ -131,4 +131,156 @@ export class AnalyticsService {
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
     return { start, end };
   }
+
+  async getInsights(workspaceId: string) {
+    const now = new Date()
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const lastMonth = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`
+
+    const { start: thisStart, end: thisEnd } = this.getDateRange(thisMonth)
+    const { start: lastStart, end: lastEnd } = this.getDateRange(lastMonth)
+
+    const [thisExpense, lastExpense, thisIncome, lastIncome, budgets, categories] = await Promise.all([
+      this.prisma.expense.aggregate({
+        where: { workspaceId, date: { gte: thisStart, lte: thisEnd } },
+        _sum: { amount: true },
+      }),
+      this.prisma.expense.aggregate({
+        where: { workspaceId, date: { gte: lastStart, lte: lastEnd } },
+        _sum: { amount: true },
+      }),
+      this.prisma.income.aggregate({
+        where: { workspaceId, date: { gte: thisStart, lte: thisEnd } },
+        _sum: { amount: true },
+      }),
+      this.prisma.income.aggregate({
+        where: { workspaceId, date: { gte: lastStart, lte: lastEnd } },
+        _sum: { amount: true },
+      }),
+      this.prisma.budget.findMany({
+        where: { workspaceId },
+        include: { category: true },
+      }),
+      this.prisma.expense.groupBy({
+        by: ['categoryId'],
+        where: { workspaceId, date: { gte: thisStart, lte: thisEnd } },
+        _sum: { amount: true },
+        orderBy: { _sum: { amount: 'desc' } },
+        take: 1,
+      }),
+    ])
+
+    const thisExpenseTotal = Number(thisExpense._sum.amount ?? 0)
+    const lastExpenseTotal = Number(lastExpense._sum.amount ?? 0)
+    const thisIncomeTotal = Number(thisIncome._sum.amount ?? 0)
+    const lastIncomeTotal = Number(lastIncome._sum.amount ?? 0)
+
+    const insights: { type: string; message: string; severity: 'info' | 'warning' | 'positive' }[] = []
+
+    // Spending vs last month
+    if (lastExpenseTotal > 0) {
+      const diff = ((thisExpenseTotal - lastExpenseTotal) / lastExpenseTotal) * 100
+      if (diff > 20) {
+        insights.push({
+          type: 'spending_up',
+          message: `You've spent ${diff.toFixed(0)}% more than last month`,
+          severity: 'warning',
+        })
+      } else if (diff < -10) {
+        insights.push({
+          type: 'spending_down',
+          message: `You've spent ${Math.abs(diff).toFixed(0)}% less than last month — great job!`,
+          severity: 'positive',
+        })
+      }
+    }
+
+    // Income vs last month
+    if (lastIncomeTotal > 0 && thisIncomeTotal > 0) {
+      const diff = ((thisIncomeTotal - lastIncomeTotal) / lastIncomeTotal) * 100
+      if (diff > 10) {
+        insights.push({
+          type: 'income_up',
+          message: `Your income is up ${diff.toFixed(0)}% compared to last month`,
+          severity: 'positive',
+        })
+      }
+    }
+
+    // No income this month
+    if (thisIncomeTotal === 0) {
+      insights.push({
+        type: 'no_income',
+        message: 'No income recorded this month yet',
+        severity: 'info',
+      })
+    }
+
+    // Savings rate
+    if (thisIncomeTotal > 0) {
+      const savingsRate = ((thisIncomeTotal - thisExpenseTotal) / thisIncomeTotal) * 100
+      if (savingsRate < 0) {
+        insights.push({
+          type: 'overspending',
+          message: `You're spending more than you earn this month`,
+          severity: 'warning',
+        })
+      } else if (savingsRate > 50) {
+        insights.push({
+          type: 'great_savings',
+          message: `Excellent! You're saving ${savingsRate.toFixed(0)}% of your income`,
+          severity: 'positive',
+        })
+      }
+    }
+
+    // Budget warnings
+    const budgetWarnings = await Promise.all(
+      budgets.map(async (budget) => {
+        const spent = await this.prisma.expense.aggregate({
+          where: { workspaceId, categoryId: budget.categoryId, date: { gte: thisStart, lte: thisEnd } },
+          _sum: { amount: true },
+        })
+        const spentAmount = Number(spent._sum.amount ?? 0)
+        const budgetAmount = Number(budget.amount)
+        const percentage = budgetAmount > 0 ? (spentAmount / budgetAmount) * 100 : 0
+        return { budget, percentage, spentAmount }
+      })
+    )
+
+    const overBudgets = budgetWarnings.filter((b) => b.percentage > 100)
+    const warningBudgets = budgetWarnings.filter((b) => b.percentage >= 80 && b.percentage <= 100)
+
+    if (overBudgets.length > 0) {
+      insights.push({
+        type: 'over_budget',
+        message: `You've exceeded ${overBudgets.length} budget${overBudgets.length > 1 ? 's' : ''} this month`,
+        severity: 'warning',
+      })
+    }
+
+    if (warningBudgets.length > 0) {
+      insights.push({
+        type: 'budget_warning',
+        message: `${warningBudgets.length} budget${warningBudgets.length > 1 ? 's are' : ' is'} nearly exhausted`,
+        severity: 'warning',
+      })
+    }
+
+    // Top spending category
+    if (categories.length > 0) {
+      const topCategoryId = categories[0].categoryId
+      const topCategory = await this.prisma.category.findUnique({ where: { id: topCategoryId } })
+      if (topCategory) {
+        insights.push({
+          type: 'top_category',
+          message: `Your biggest spend this month is ${topCategory.name}`,
+          severity: 'info',
+        })
+      }
+    }
+
+    return insights
+  }
 }

@@ -27,4 +27,9 @@ export class AnalyticsController {
   getBudgetStatus(@Request() req, @Query('month') month?: string) {
     return this.analyticsService.getBudgetStatus(req.workspace.id, month);
   }
+
+  @Get('insights')
+  getInsights(@Request() req) {
+    return this.analyticsService.getInsights(req.workspace.id);
+  }
 }
