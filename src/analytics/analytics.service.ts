@@ -289,19 +289,56 @@ export class AnalyticsService {
     const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     const { start, end } = this.getDateRange(thisMonth)
 
+    // Get tax profile
+    const taxProfile = await this.prisma.taxProfile.findUnique({
+      where: { workspaceId },
+    })
+
+    const employmentType = taxProfile?.employmentType ?? 'SELF_EMPLOYED'
+    const taxableCategories = taxProfile?.taxableCategories ?? []
+
+    // Build income query based on employment type and taxable categories
+    const incomeWhere: any = { workspaceId, date: { gte: start, lte: end } }
+
+    if (employmentType === 'SALARIED') {
+      // Salaried — tax already deducted, only tax side income (taxable categories)
+      if (taxableCategories.length > 0) {
+        incomeWhere.categoryId = { in: taxableCategories }
+      } else {
+        // No taxable categories selected — nothing to estimate
+        return {
+          type: workspace.type,
+          monthlyIncome: 0,
+          annualIncome: 0,
+          annualTax: 0,
+          monthlyTax: 0,
+          effectiveRate: 0,
+          employmentType,
+          note: 'No taxable income selected. If you have side income, update your tax profile.',
+        }
+      }
+    } else if (employmentType === 'MIXED') {
+      // Mixed — exclude non-taxable categories
+      if (taxableCategories.length > 0) {
+        incomeWhere.categoryId = { in: taxableCategories }
+      }
+      // If no categories selected, treat all income as taxable
+    }
+    // SELF_EMPLOYED — all income is taxable, no filter needed
+
     const incomeAgg = await this.prisma.income.aggregate({
-      where: { workspaceId, date: { gte: start, lte: end } },
+      where: incomeWhere,
       _sum: { amount: true },
     })
 
     const monthlyIncome = Number(incomeAgg._sum.amount ?? 0)
     const annualIncome = monthlyIncome * 12
 
-    if (workspace.type === 'PERSONAL') {
-      return this.calculatePersonalTax(monthlyIncome, annualIncome)
-    } else {
-      return this.calculateBusinessTax(monthlyIncome, annualIncome)
-    }
+    const result = workspace.type === 'PERSONAL'
+      ? this.calculatePersonalTax(monthlyIncome, annualIncome)
+      : this.calculateBusinessTax(monthlyIncome, annualIncome)
+
+    return { ...result, employmentType }
   }
 
   private calculatePersonalTax(monthlyIncome: number, annualIncome: number) {

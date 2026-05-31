@@ -1,12 +1,14 @@
-import { Controller, Get, UseGuards, Request, Query, Param } from '@nestjs/common';
+import { Controller, Get, UseGuards, Request, Query, Patch, Body } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { WorkspaceGuard } from '../workspaces/workspace.guard'
 import { AnalyticsService } from './analytics.service'
+import { TaxProfileService } from './tax-profile.service';
+import { EmploymentType } from '@prisma/client';
 
 @Controller('w/:workspaceId/analytics')
 @UseGuards(JwtAuthGuard, WorkspaceGuard)
 export class AnalyticsController {
-  constructor(private readonly analyticsService: AnalyticsService) {}
+  constructor(private readonly analyticsService: AnalyticsService, private readonly taxProfileService: TaxProfileService) {}
 
   @Get('overview')
   getOverview(@Request() req, @Query('month') month?: string) {
@@ -37,4 +39,15 @@ export class AnalyticsController {
   getTaxEstimate(@Request() req) {
     return this.analyticsService.getTaxEstimate(req.workspace.id, req.workspace);
   }
+
+  @Get('tax/profile')
+  getTaxProfile(@Request() req) {
+    return this.taxProfileService.getOrCreate(req.workspace.id)
+  }
+
+  @Patch('tax/profile')
+  updateTaxProfile(@Request() req, @Body() dto: { employmentType?: EmploymentType; taxableCategories?: string[] }) {
+    return this.taxProfileService.update(req.workspace.id, dto)
+  }
+
 }

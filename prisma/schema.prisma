@@ -165,6 +165,7 @@ model Workspace {
   expenses   Expense[]
   income     Income[]
   budgets    Budget[]
+  taxProfile TaxProfile?
 
   @@unique([name, ownerId])
   @@map("workspaces")
@@ -196,4 +197,26 @@ enum WorkspaceRole {
   ADMIN
   EDITOR
   VIEWER
+}
+
+
+
+model TaxProfile {
+  id               String   @id @default(cuid())
+  workspaceId      String   @unique @map("workspace_id")
+  employmentType   EmploymentType @default(SELF_EMPLOYED) @map("employment_type")
+  taxableCategories String[] @map("taxable_categories")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("tax_profiles")
+}
+
+
+enum EmploymentType {
+  SALARIED
+  SELF_EMPLOYED
+  MIXED
 }
