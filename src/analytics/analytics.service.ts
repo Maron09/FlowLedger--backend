@@ -38,8 +38,10 @@ export class AnalyticsService {
     return {
       totalIncome,
       totalExpenses: totalExpense,
-      balance: allTimeBalance,  // cumulative all-time balance
+      balance: allTimeBalance,
       savingsRate: totalIncome > 0 ? ((totalIncome - totalExpense) / totalIncome) * 100 : 0,
+      allTimeIncome: Number(allTimeIncome._sum.amount ?? 0),
+      allTimeExpenses: Number(allTimeExpense._sum.amount ?? 0),
     }
   }
 
