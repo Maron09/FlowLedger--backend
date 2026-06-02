@@ -46,7 +46,18 @@ export class AnalyticsController {
   }
 
   @Patch('tax/profile')
-  updateTaxProfile(@Request() req, @Body() dto: { employmentType?: EmploymentType; taxableCategories?: string[] }) {
+  updateTaxProfile(
+    @Request() req,
+    @Body() dto: {
+      employmentType?: EmploymentType
+      taxableCategories?: string[]
+      businessSector?: string
+      businessSize?: string
+      handlesPaye?: boolean
+      vatRegistered?: boolean
+      deductibleCategories?: string[]
+    }
+  ) {
     return this.taxProfileService.update(req.workspace.id, dto)
   }
 

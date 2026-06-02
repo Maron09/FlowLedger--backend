@@ -286,8 +286,9 @@ export class AnalyticsService {
 
   async getTaxEstimate(workspaceId: string, workspace: any) {
     const now = new Date()
-    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-    const { start, end } = this.getDateRange(thisMonth)
+    const currentYear = now.getFullYear()
+    const { start, end } = this.getDateRange(`${currentYear}-01`)
+    const yearEnd = new Date(currentYear, 11, 31, 23, 59, 59, 999)
 
     // Get tax profile
     const taxProfile = await this.prisma.taxProfile.findUnique({
@@ -296,18 +297,59 @@ export class AnalyticsService {
 
     const employmentType = taxProfile?.employmentType ?? 'SELF_EMPLOYED'
     const taxableCategories = taxProfile?.taxableCategories ?? []
+    const deductibleCategories = taxProfile?.deductibleCategories ?? []
+    const vatRegistered = taxProfile?.vatRegistered ?? false
+    const businessSector = taxProfile?.businessSector ?? 'GENERAL'
+    const businessSize = taxProfile?.businessSize ?? 'SMALL'
 
-    // Build income query based on employment type and taxable categories
-    const incomeWhere: any = { workspaceId, date: { gte: start, lte: end } }
+    if (workspace.type === 'BUSINESS') {
+      // YTD revenue
+      const revenueWhere: any = { workspaceId, date: { gte: start, lte: yearEnd } }
+      if (taxableCategories.length > 0) revenueWhere.categoryId = { in: taxableCategories }
+
+      // YTD expenses
+      const expenseWhere: any = { workspaceId, date: { gte: start, lte: yearEnd } }
+      if (deductibleCategories.length > 0) expenseWhere.categoryId = { in: deductibleCategories }
+
+      const [revenueAgg, expenseAgg] = await Promise.all([
+        this.prisma.income.aggregate({ where: revenueWhere, _sum: { amount: true } }),
+        this.prisma.expense.aggregate({ where: expenseWhere, _sum: { amount: true } }),
+      ])
+
+      const ytdRevenue = Number(revenueAgg._sum.amount ?? 0)
+      const ytdExpenses = Number(expenseAgg._sum.amount ?? 0)
+      const taxableProfit = Math.max(0, ytdRevenue - ytdExpenses)
+
+      // Annualize based on months elapsed
+      const monthsElapsed = now.getMonth() + 1
+      const annualizedRevenue = (ytdRevenue / monthsElapsed) * 12
+      const annualizedProfit = (taxableProfit / monthsElapsed) * 12
+
+      return this.calculateBusinessTax(
+        ytdRevenue,
+        ytdExpenses,
+        taxableProfit,
+        annualizedRevenue,
+        annualizedProfit,
+        vatRegistered,
+        businessSector,
+        businessSize,
+        taxProfile?.handlesPaye ?? false,
+        monthsElapsed,
+      )
+    }
+
+    // Personal tax logic (unchanged)
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const { start: thisStart, end: thisEnd } = this.getDateRange(thisMonth)
+    const incomeWhere: any = { workspaceId, date: { gte: thisStart, lte: thisEnd } }
 
     if (employmentType === 'SALARIED') {
-      // Salaried — tax already deducted, only tax side income (taxable categories)
       if (taxableCategories.length > 0) {
         incomeWhere.categoryId = { in: taxableCategories }
       } else {
-        // No taxable categories selected — nothing to estimate
         return {
-          type: workspace.type,
+          type: 'PERSONAL',
           monthlyIncome: 0,
           annualIncome: 0,
           annualTax: 0,
@@ -318,13 +360,10 @@ export class AnalyticsService {
         }
       }
     } else if (employmentType === 'MIXED') {
-      // Mixed — exclude non-taxable categories
       if (taxableCategories.length > 0) {
         incomeWhere.categoryId = { in: taxableCategories }
       }
-      // If no categories selected, treat all income as taxable
     }
-    // SELF_EMPLOYED — all income is taxable, no filter needed
 
     const incomeAgg = await this.prisma.income.aggregate({
       where: incomeWhere,
@@ -334,10 +373,7 @@ export class AnalyticsService {
     const monthlyIncome = Number(incomeAgg._sum.amount ?? 0)
     const annualIncome = monthlyIncome * 12
 
-    const result = workspace.type === 'PERSONAL'
-      ? this.calculatePersonalTax(monthlyIncome, annualIncome)
-      : this.calculateBusinessTax(monthlyIncome, annualIncome)
-
+    const result = this.calculatePersonalTax(monthlyIncome, annualIncome)
     return { ...result, employmentType }
   }
 
@@ -389,27 +425,67 @@ export class AnalyticsService {
     }
   }
 
-  private calculateBusinessTax(monthlyIncome: number, annualIncome: number) {
-    // CIT: 20% for turnover < ₦100M, 30% for ₦100M+
-    const isSmall = annualIncome < 100_000_000
-    const citRate = isSmall ? 0.20 : 0.30
-    const annualTax = annualIncome * citRate
-    const monthlyTax = annualTax / 12
+  private calculateBusinessTax(
+    ytdRevenue: number,
+    ytdExpenses: number,
+    taxableProfit: number,
+    annualizedRevenue: number,
+    annualizedProfit: number,
+    vatRegistered: boolean,
+    sector: string,
+    size: string,
+    handlesPaye: boolean,
+    monthsElapsed: number,
+  ) {
+    // CIT rate based on sector and size
+    let citRate = 0.30
+    let sectorNote = ''
 
-    // VAT estimate: 7.5% on eligible transactions
-    const monthlyVat = monthlyIncome * 0.075
+    if (sector === 'AGRICULTURE') {
+      citRate = 0
+      sectorNote = 'Agricultural businesses are exempt from CIT for the first 5 years'
+    } else if (sector === 'MANUFACTURING') {
+      citRate = annualizedRevenue < 100_000_000 ? 0.20 : 0.25
+      sectorNote = 'Manufacturing sector reduced rate applies'
+    } else {
+      // General / Tech / Other
+      citRate = annualizedRevenue < 100_000_000 ? 0.20 : 0.30
+      sectorNote = annualizedRevenue < 100_000_000
+        ? 'Small company rate (under ₦100M annual revenue)'
+        : 'Large company rate (₦100M+ annual revenue)'
+    }
+
+    const annualTax = annualizedProfit * citRate
+    const ytdTax = taxableProfit * citRate
+    const monthlyTaxProvision = annualTax / 12
+
+    // VAT
+    const monthlyRevenue = ytdRevenue / monthsElapsed
+    const monthlyVat = vatRegistered ? monthlyRevenue * 0.075 : 0
+    const annualVat = monthlyVat * 12
+
+    const totalMonthlyProvision = monthlyTaxProvision + monthlyVat
 
     return {
       type: 'BUSINESS',
-      monthlyIncome,
-      annualIncome,
+      ytdRevenue,
+      ytdExpenses,
+      taxableProfit,
+      annualizedRevenue,
+      annualizedProfit,
       citRate: citRate * 100,
       annualTax,
-      monthlyTax,
+      ytdTax,
+      monthlyTaxProvision,
+      vatRegistered,
       monthlyVat,
-      effectiveRate: citRate * 100,
-      companySize: isSmall ? 'Small (under ₦100M turnover)' : 'Large (₦100M+ turnover)',
-      note: `CIT at ${citRate * 100}% + VAT at 7.5%. Set aside ₦${Math.ceil(monthlyTax + monthlyVat).toLocaleString()} monthly.`,
+      annualVat,
+      totalMonthlyProvision,
+      handlesPaye,
+      sector,
+      size,
+      effectiveRate: annualizedProfit > 0 ? citRate * 100 : 0,
+      note: `CIT on net profit at ${citRate * 100}%${vatRegistered ? ' + VAT at 7.5%' : ''}. Set aside ₦${Math.ceil(totalMonthlyProvision).toLocaleString()} monthly. ${sectorNote}`,
     }
   }
 }

@@ -206,6 +206,15 @@ model TaxProfile {
   workspaceId      String   @unique @map("workspace_id")
   employmentType   EmploymentType @default(SELF_EMPLOYED) @map("employment_type")
   taxableCategories String[] @map("taxable_categories")
+
+  // Business fields
+  businessSector      String?  @map("business_sector")
+  businessSize        String?  @map("business_size")
+  handlesPaye         Boolean  @default(false) @map("handles_paye")
+  vatRegistered       Boolean  @default(false) @map("vat_registered")
+  deductibleCategories String[] @map("deductible_categories")
+
+  
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
