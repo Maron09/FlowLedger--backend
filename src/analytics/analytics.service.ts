@@ -6,9 +6,10 @@ export class AnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getOverview(workspaceId: string, month?: string) {
-    const { start, end } = this.getDateRange(month);
+    const { start, end } = this.getDateRange(month)
 
-    const [expense, income] = await Promise.all([
+    const [expense, income, allTimeExpense, allTimeIncome] = await Promise.all([
+      // This month
       this.prisma.expense.aggregate({
         where: { workspaceId, date: { gte: start, lte: end } },
         _sum: { amount: true },
@@ -19,42 +20,52 @@ export class AnalyticsService {
         _sum: { amount: true },
         _count: { id: true },
       }),
-    ]);
+      // All time
+      this.prisma.expense.aggregate({
+        where: { workspaceId },
+        _sum: { amount: true },
+      }),
+      this.prisma.income.aggregate({
+        where: { workspaceId },
+        _sum: { amount: true },
+      }),
+    ])
 
-    const totalExpense = Number(expense._sum.amount ?? 0);
-    const totalIncome = Number(income._sum.amount ?? 0);
+    const totalExpense = Number(expense._sum.amount ?? 0)
+    const totalIncome = Number(income._sum.amount ?? 0)
+    const allTimeBalance = Number(allTimeIncome._sum.amount ?? 0) - Number(allTimeExpense._sum.amount ?? 0)
 
     return {
       totalIncome,
       totalExpenses: totalExpense,
-      balance: totalIncome - totalExpense,
+      balance: allTimeBalance,  // cumulative all-time balance
       savingsRate: totalIncome > 0 ? ((totalIncome - totalExpense) / totalIncome) * 100 : 0,
-    };
+    }
   }
 
   async getCategoryBreakdown(workspaceId: string, month?: string) {
-    const { start, end } = this.getDateRange(month);
+    const { start, end } = this.getDateRange(month)
 
     const breakdown = await this.prisma.expense.groupBy({
       by: ['categoryId'],
       where: { workspaceId, date: { gte: start, lte: end } },
       _sum: { amount: true },
       orderBy: { _sum: { amount: 'desc' } },
-    });
+    })
 
-    const categoryIds = breakdown.map((b) => b.categoryId);
+    const categoryIds = breakdown.map((b) => b.categoryId)
     const categories = await this.prisma.category.findMany({
       where: { id: { in: categoryIds } },
-    });
+    })
 
-    const catMap = Object.fromEntries(categories.map((c) => [c.id, c]));
-    const totalSpent = breakdown.reduce((sum, b) => sum + Number(b._sum.amount ?? 0), 0);
+    const catMap = Object.fromEntries(categories.map((c) => [c.id, c]))
+    const totalSpent = breakdown.reduce((sum, b) => sum + Number(b._sum.amount ?? 0), 0)
 
     return breakdown.map((b) => ({
       category: catMap[b.categoryId],
       totalSpent: Number(b._sum.amount ?? 0),
       percentage: totalSpent > 0 ? (Number(b._sum.amount ?? 0) / totalSpent) * 100 : 0,
-    }));
+    }))
   }
 
   async getMonthlyTrend(workspaceId: string, months: number = 6) {
