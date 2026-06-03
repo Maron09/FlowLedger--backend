@@ -30,49 +30,61 @@ export class ExpensesService {
   }
 
   private async checkBudgetAndNotify(userId: string, workspaceId: string, categoryId: string) {
-    // Find budget for this category
-    const budget = await this.prisma.budget.findFirst({
-      where: { workspaceId, categoryId },
-      include: { category: true },
-    })
+    try {
+      console.log(`[Budget Check] userId=${userId} workspaceId=${workspaceId} categoryId=${categoryId}`)
 
-    if (!budget) return
+      const budget = await this.prisma.budget.findFirst({
+        where: { workspaceId, categoryId },
+        include: { category: true },
+      })
 
-    // Calculate this month's spending for this category
-    const now = new Date()
-    const start = new Date(now.getFullYear(), now.getMonth(), 1)
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+      if (!budget) {
+        console.log(`[Budget Check] No budget found for category ${categoryId}`)
+        return
+      }
 
-    const spent = await this.prisma.expense.aggregate({
-      where: { workspaceId, categoryId, date: { gte: start, lte: end } },
-      _sum: { amount: true },
-    })
+      const now = new Date()
+      const start = new Date(now.getFullYear(), now.getMonth(), 1)
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
 
-    const spentAmount = Number(spent._sum.amount ?? 0)
-    const budgetAmount = Number(budget.amount)
-    const percentage = budgetAmount > 0 ? (spentAmount / budgetAmount) * 100 : 0
+      const spent = await this.prisma.expense.aggregate({
+        where: { workspaceId, categoryId, date: { gte: start, lte: end } },
+        _sum: { amount: true },
+      })
 
-    // Only notify at 80% or exceeded — avoid spamming
-    if (percentage < 80) return
+      const spentAmount = Number(spent._sum.amount ?? 0)
+      const budgetAmount = Number(budget.amount)
+      const percentage = budgetAmount > 0 ? (spentAmount / budgetAmount) * 100 : 0
 
-    const status = percentage >= 100 ? 'exceeded' : 'warning'
+      console.log(`[Budget Check] spent=${spentAmount} budget=${budgetAmount} percentage=${percentage}`)
 
-    // Get user email
-    const user = await this.prisma.user.findUnique({ where: { id: userId } })
-    if (!user) return
+      if (percentage < 80) {
+        console.log(`[Budget Check] Below 80%, no notification needed`)
+        return
+      }
 
-    // Get workspace name
-    const workspace = await this.prisma.workspace.findUnique({ where: { id: workspaceId } })
-    if (!workspace) return
+      const status = percentage >= 100 ? 'exceeded' : 'warning'
+      console.log(`[Budget Check] Sending ${status} email`)
 
-    await this.emailService.sendBudgetWarning(user.email, {
-      categoryName: budget.category.name,
-      spent: spentAmount,
-      budget: budgetAmount,
-      percentage,
-      status,
-      workspaceName: workspace.name,
-    })
+      const user = await this.prisma.user.findUnique({ where: { id: userId } })
+      if (!user) return
+
+      const workspace = await this.prisma.workspace.findUnique({ where: { id: workspaceId } })
+      if (!workspace) return
+
+      await this.emailService.sendBudgetWarning(user.email, {
+        categoryName: budget.category.name,
+        spent: spentAmount,
+        budget: budgetAmount,
+        percentage,
+        status,
+        workspaceName: workspace.name,
+      })
+
+      console.log(`[Budget Check] Email sent to ${user.email}`)
+    } catch (err) {
+      console.error('[Budget Check] Error:', err)
+    }
   }
 
   async findAll(workspaceId: string, query: QueryExpensesDto) {
