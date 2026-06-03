@@ -1,23 +1,27 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Brevo, BrevoClient } from '@getbrevo/brevo';
+import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class EmailService {
-  private client: BrevoClient
+  private transporter: nodemailer.Transporter
 
   constructor(private readonly config: ConfigService) {
-    this.client = new BrevoClient({
-      apiKey: config.get<string>('BREVO_API_KEY') ?? '',
+    this.transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: config.get<string>('GMAIL_USER'),
+        pass: config.get<string>('GMAIL_APP_PASSWORD'),
+      },
     })
   }
 
   async sendPasswordReset(email: string, resetUrl: string) {
-    await this.client.transactionalEmails.sendTransacEmail({
-      to: [{ email }],
-      sender: { name: 'FlowLedger', email: 'noreply@flowledger.app' },
+    await this.transporter.sendMail({
+      from: `"FlowLedger" <${this.config.get('GMAIL_USER')}>`,
+      to: email,
       subject: 'Reset your FlowLedger password',
-      htmlContent: `
+      html: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
           <h2 style="color: #10b981; margin-bottom: 8px;">FlowLedger</h2>
           <h3 style="color: #111; margin-bottom: 16px;">Reset your password</h3>
@@ -51,13 +55,13 @@ export class EmailService {
     const formatNaira = (amount: number) =>
       new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(amount)
 
-    await this.client.transactionalEmails.sendTransacEmail({
-      to: [{ email }],
-      sender: { name: 'FlowLedger', email: 'noreply@flowledger.app' },
+    await this.transporter.sendMail({
+      from: `"FlowLedger" <${this.config.get('GMAIL_USER')}>`,
+      to: email,
       subject: isExceeded
         ? `Budget exceeded — ${data.categoryName}`
         : `Budget warning — ${data.categoryName} at ${data.percentage.toFixed(0)}%`,
-      htmlContent: `
+      html: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
           <h2 style="color: #10b981; margin-bottom: 8px;">FlowLedger</h2>
           <h3 style="color: #111; margin-bottom: 16px;">
