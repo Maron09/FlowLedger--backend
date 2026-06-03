@@ -126,6 +126,8 @@ model Budget {
   workspaceId String      @map("workspace_id")
   period        String        @default("MONTHLY")
   categoryId    String        @map("category_id")
+  lastAlertAt    DateTime? @map("last_alert_at")
+  lastAlertType  String?   @map("last_alert_type")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
 
