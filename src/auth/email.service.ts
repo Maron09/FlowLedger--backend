@@ -18,7 +18,7 @@ export class EmailService {
   async sendPasswordReset(email: string, resetUrl: string) {
     await this.client.transactionalEmails.sendTransacEmail({
       to: [{ email }],
-      sender: { name: 'FlowLedger', email: 'noreply@flowledger.app' },
+      sender: { name: 'FlowLedger', email: 'flowhq.dev@gmail.com' },
       subject: 'Reset your FlowLedger password',
       htmlContent: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
