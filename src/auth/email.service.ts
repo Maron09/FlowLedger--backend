@@ -7,6 +7,7 @@ export class EmailService {
   private client: BrevoClient
 
   constructor(private readonly config: ConfigService) {
+    console.log('[EmailService] Initializing with BrevoClient v2')
     this.client = new BrevoClient({
       apiKey: config.get<string>('BREVO_API_KEY') ?? '',
     })
