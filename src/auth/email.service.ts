@@ -56,7 +56,7 @@ export class EmailService {
 
     await this.client.transactionalEmails.sendTransacEmail({
       to: [{ email }],
-      sender: { name: 'FlowLedger', email: 'noreply@flowledger.app' },
+      sender: { name: 'FlowLedger', email: 'flowhq.dev@gmail.com' },
       subject: isExceeded
         ? `Budget exceeded — ${data.categoryName}`
         : `Budget warning — ${data.categoryName} at ${data.percentage.toFixed(0)}%`,
