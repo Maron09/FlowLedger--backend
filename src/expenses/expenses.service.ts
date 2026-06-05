@@ -64,6 +64,16 @@ export class ExpensesService {
       }
 
       const status = percentage >= 100 ? 'exceeded' : 'warning'
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+      if (
+        budget.lastAlertAt &&
+        budget.lastAlertAt >= monthStart &&
+        budget.lastAlertType === status
+      ) {
+        console.log(`[Budget Check] Already sent ${status} alert this month`)
+        return
+      }
+
       console.log(`[Budget Check] Sending ${status} email`)
 
       const user = await this.prisma.user.findUnique({ where: { id: userId } })
