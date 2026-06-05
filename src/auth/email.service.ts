@@ -7,9 +7,11 @@ export class EmailService {
   private client: BrevoClient
 
   constructor(private readonly config: ConfigService) {
+    const apiKey = config.get<string>('BREVO_API_KEY') ?? ''
     console.log('[EmailService] Initializing with BrevoClient v2')
+    console.log('[EmailService] API key length:', apiKey.length)
     this.client = new BrevoClient({
-      apiKey: config.get<string>('BREVO_API_KEY') ?? '',
+      apiKey,
     })
   }
 
