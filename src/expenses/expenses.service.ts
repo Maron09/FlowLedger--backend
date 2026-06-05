@@ -90,6 +90,11 @@ export class ExpensesService {
         status,
         workspaceName: workspace.name,
       })
+      await this.prisma.budget.update({
+        where: { id: budget.id },
+        data: { lastAlertAt: new Date(), lastAlertType: status },
+      })
+
 
       console.log(`[Budget Check] Email sent to ${user.email}`)
     } catch (err) {
