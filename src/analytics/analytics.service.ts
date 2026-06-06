@@ -390,6 +390,39 @@ export class AnalyticsService {
     return { ...result, employmentType }
   }
 
+  async getIncomeSources(workspaceId: string, month?: string) {
+    const { start, end } = this.getDateRange(month)
+
+    const incomeRecords = await this.prisma.income.findMany({
+      where: { workspaceId, date: { gte: start, lte: end } },
+      select: { source: true, amount: true, title: true }
+    })
+
+    const sourceMap = new Map<string, { total: number, count: number }>()
+
+    for (const record of incomeRecords) {
+      const key = record.source?.trim() || 'Other'
+      const existiing = sourceMap.get(key) ?? { total: 0, count: 0 }
+      sourceMap.set(key, {
+        total: existiing.total + Number(record.amount),
+        count: existiing.count + 1,
+      })
+    }
+
+    const totalIncome = Array.from(sourceMap.values()).reduce((sum, s) => sum + s.total, 0)
+    
+    const sources = Array.from(sourceMap.entries())
+      .map(([source, data]) => ({
+        source,
+        total: data.total,
+        count: data.count,
+        percentage: totalIncome > 0 ? (data.total / totalIncome) * 100 : 0,
+      }))
+      .sort((a, b) => b.total - a.total)
+    
+    return { sources, totalIncome }
+  }
+
   private calculatePersonalTax(monthlyIncome: number, annualIncome: number) {
     // NTA 2025 bands (annual)
     const bands = [

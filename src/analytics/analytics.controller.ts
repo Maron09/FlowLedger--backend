@@ -61,4 +61,9 @@ export class AnalyticsController {
     return this.taxProfileService.update(req.workspace.id, dto)
   }
 
+  @Get('income-sources')
+  getIncomeSources(@Request() req, @Query('month') month?: string) {
+    return this.analyticsService.getIncomeSources(req.workspace.id, month);
+  }
+
 }
