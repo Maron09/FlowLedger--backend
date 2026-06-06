@@ -398,22 +398,24 @@ export class AnalyticsService {
       select: { source: true, amount: true, title: true }
     })
 
-    const sourceMap = new Map<string, { total: number, count: number }>()
+    const sourceMap = new Map<string, { total: number; count: number; displayName: string }>()
 
     for (const record of incomeRecords) {
-      const key = record.source?.trim() || 'Other'
-      const existiing = sourceMap.get(key) ?? { total: 0, count: 0 }
+      const key = record.source?.trim().toLowerCase() || 'other'
+      const displayName = record.source?.trim() || 'Other'
+      const existing = sourceMap.get(key) ?? { total: 0, count: 0, displayName }
       sourceMap.set(key, {
-        total: existiing.total + Number(record.amount),
-        count: existiing.count + 1,
+        total: existing.total + Number(record.amount),
+        count: existing.count + 1,
+        displayName: existing.displayName,
       })
     }
 
     const totalIncome = Array.from(sourceMap.values()).reduce((sum, s) => sum + s.total, 0)
     
     const sources = Array.from(sourceMap.entries())
-      .map(([source, data]) => ({
-        source,
+      .map(([_, data]) => ({
+        source: data.displayName,
         total: data.total,
         count: data.count,
         percentage: totalIncome > 0 ? (data.total / totalIncome) * 100 : 0,
