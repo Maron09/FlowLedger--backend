@@ -10,7 +10,7 @@ export class ExportService {
     type: 'all' | 'expenses' | 'income',
     startDate: string,
     endDate: string,
-    ): Promise<string> {
+  ): Promise<string> {
     const start = new Date(startDate)
     const end = new Date(endDate)
     end.setHours(23, 59, 59, 999)
@@ -18,18 +18,19 @@ export class ExportService {
     const workspace = await this.prisma.workspace.findUnique({ where: { id: workspaceId } })
 
     const formatDate = (date: Date) =>
-        date.toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' })
+      date.toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' })
 
+    // Wrap in quotes to prevent comma-in-number splitting in Excel
     const formatAmount = (amount: any) =>
-        `NGN ${Number(amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}`
+      `"NGN ${Number(amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}"`
 
     const rows: string[] = []
 
     // Header
-    rows.push(`FlowLedger Financial Statement`)
-    rows.push(`Workspace,${workspace?.name ?? ''}`)
+    rows.push('FlowLedger Financial Statement')
+    rows.push(`Workspace,"${workspace?.name ?? ''}"`)
     rows.push(`Type,${workspace?.type ?? ''}`)
-    rows.push(`Period,${formatDate(start)} to ${formatDate(end)}`)
+    rows.push(`Period,"${formatDate(start)} to ${formatDate(end)}"`)
     rows.push(`Generated,${formatDate(new Date())}`)
     rows.push(`Export Type,${type === 'all' ? 'Full Statement' : type === 'expenses' ? 'Expenses Only' : 'Income Only'}`)
     rows.push('')
@@ -38,73 +39,73 @@ export class ExportService {
     let totalIncome = 0
 
     if (type === 'all' || type === 'expenses') {
-        const expenses = await this.prisma.expense.findMany({
+      const expenses = await this.prisma.expense.findMany({
         where: { workspaceId, date: { gte: start, lte: end } },
         include: { category: true },
         orderBy: { date: 'desc' },
-        })
+      })
 
-        totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0)
+      totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0)
 
-        rows.push('EXPENSES')
-        rows.push(`Total Expenses,${formatAmount(totalExpenses)}`)
-        rows.push('')
-        rows.push('Date,Title,Category,Amount,Payment Method,Notes')
+      rows.push('EXPENSES')
+      rows.push(`Total Expenses,${formatAmount(totalExpenses)}`)
+      rows.push('')
+      rows.push('Date,Title,Category,Amount,Payment Method,Notes')
 
-        for (const e of expenses) {
+      for (const e of expenses) {
         rows.push([
-            formatDate(new Date(e.date)),
-            `"${e.title.replace(/"/g, '""')}"`,
-            `"${e.category?.name ?? 'Uncategorized'}"`,
-            formatAmount(e.amount),
-            e.paymentMethod.replace(/_/g, ' '),
-            `"${(e.description ?? '').replace(/"/g, '""')}"`,
+          `"${formatDate(new Date(e.date))}"`,
+          `"${e.title.replace(/"/g, '""')}"`,
+          `"${e.category?.name ?? 'Uncategorized'}"`,
+          formatAmount(e.amount),
+          `"${e.paymentMethod.replace(/_/g, ' ')}"`,
+          `"${(e.description ?? '').replace(/"/g, '""')}"`,
         ].join(','))
-        }
+      }
 
-        rows.push('')
+      rows.push('')
     }
 
     if (type === 'all' || type === 'income') {
-        const income = await this.prisma.income.findMany({
+      const income = await this.prisma.income.findMany({
         where: { workspaceId, date: { gte: start, lte: end } },
         include: { category: true },
         orderBy: { date: 'desc' },
-        })
+      })
 
-        totalIncome = income.reduce((sum, i) => sum + Number(i.amount), 0)
+      totalIncome = income.reduce((sum, i) => sum + Number(i.amount), 0)
 
-        rows.push('INCOME')
-        rows.push(`Total Income,${formatAmount(totalIncome)}`)
-        rows.push('')
-        rows.push('Date,Title,Category,Source,Amount')
+      rows.push('INCOME')
+      rows.push(`Total Income,${formatAmount(totalIncome)}`)
+      rows.push('')
+      rows.push('Date,Title,Category,Source,Amount')
 
-        for (const i of income) {
+      for (const i of income) {
         rows.push([
-            formatDate(new Date(i.date)),
-            `"${i.title.replace(/"/g, '""')}"`,
-            `"${i.category?.name ?? 'Uncategorized'}"`,
-            `"${(i.source ?? '').replace(/"/g, '""')}"`,
-            formatAmount(i.amount),
+          `"${formatDate(new Date(i.date))}"`,
+          `"${i.title.replace(/"/g, '""')}"`,
+          `"${i.category?.name ?? 'Uncategorized'}"`,
+          `"${(i.source ?? '').replace(/"/g, '""')}"`,
+          formatAmount(i.amount),
         ].join(','))
-        }
+      }
 
-        rows.push('')
+      rows.push('')
     }
 
     // Summary
     if (type === 'all') {
-        const balance = totalIncome - totalExpenses
-        rows.push('SUMMARY')
-        rows.push(`Total Income,${formatAmount(totalIncome)}`)
-        rows.push(`Total Expenses,${formatAmount(totalExpenses)}`)
-        rows.push(`Net Balance,${formatAmount(balance)}`)
-        rows.push(`Status,${balance >= 0 ? 'Positive' : 'Negative'}`)
+      const balance = totalIncome - totalExpenses
+      rows.push('SUMMARY')
+      rows.push(`Total Income,${formatAmount(totalIncome)}`)
+      rows.push(`Total Expenses,${formatAmount(totalExpenses)}`)
+      rows.push(`Net Balance,${formatAmount(balance)}`)
+      rows.push(`Status,${balance >= 0 ? 'Positive' : 'Negative'}`)
     }
 
     rows.push('')
     rows.push('Generated by FlowLedger — https://flow-ledger-frontend-1th9.vercel.app')
 
     return rows.join('\n')
-    }
+  }
 }
