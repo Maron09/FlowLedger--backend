@@ -39,13 +39,12 @@ export class WorkspacesService {
             include: {
             _count: { select: { members: true } },
             members: {
-                where: { userId },
-                select: { role: true },
+                select: { role: true, userId: true },
             },
             },
             orderBy: { createdAt: 'asc' },
-        });
-    }
+        })
+        }
 
     async findOne(id: string, userId: string) {
         const workspace = await this.prisma.workspace.findUnique({
