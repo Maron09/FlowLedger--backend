@@ -3,25 +3,27 @@ import { BudgetsService } from './budgets.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { CreateBudgetDto } from './dto/create-budget.dto';
 import { WorkspaceGuard } from '../workspaces/workspace.guard'
-
+import { RolesGuard, RequireRoles } from '../workspaces/roles.guard'
 
 @Controller('w/:workspaceId/budgets')
-@UseGuards(JwtAuthGuard, WorkspaceGuard)
+@UseGuards(JwtAuthGuard, WorkspaceGuard, RolesGuard)
 export class BudgetsController {
-    constructor(private readonly budgetsService: BudgetsService) {}
-    
-    @Post()
-    upsert(@Body() dto: CreateBudgetDto, @Request() req) {
-        return this.budgetsService.upsert(req.user.id, req.workspace.id, dto);
-    }
+  constructor(private readonly budgetsService: BudgetsService) {}
 
-    @Get()
-    findAll(@Param('workspaceId') workspaceId: string, @Request() req) {
-        return this.budgetsService.findAll(workspaceId);
-    }
+  @Post()
+  @RequireRoles('ADMIN')
+  upsert(@Body() dto: CreateBudgetDto, @Request() req) {
+    return this.budgetsService.upsert(req.user.id, req.workspace.id, dto)
+  }
 
-    @Delete(':id')
-    remove(@Param('id') id: string, @Request() req) {
-        return this.budgetsService.remove(id, req.user.id);
-    }
+  @Get()
+  findAll(@Param('workspaceId') workspaceId: string) {
+    return this.budgetsService.findAll(workspaceId)
+  }
+
+  @Delete(':id')
+  @RequireRoles('ADMIN')
+  remove(@Param('id') id: string, @Request() req) {
+    return this.budgetsService.remove(id, req.user.id)
+  }
 }

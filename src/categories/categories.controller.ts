@@ -4,36 +4,38 @@ import { CategoriesService } from './categories.service'
 import { CreateCategoryDto } from './dto/create-category.dto'
 import { UpdateCategoryDto } from './dto/update.dto'
 import { WorkspaceGuard } from '../workspaces/workspace.guard'
+import { RolesGuard, RequireRoles } from '../workspaces/roles.guard'
 
 @Controller('w/:workspaceId/categories')
-@UseGuards(JwtAuthGuard, WorkspaceGuard)
+@UseGuards(JwtAuthGuard, WorkspaceGuard, RolesGuard)
 export class CategoriesController {
-    constructor(private readonly categoriesService: CategoriesService) {}
+  constructor(private readonly categoriesService: CategoriesService) {}
 
+  @Post()
+  @RequireRoles('EDITOR')
+  create(@Body() dto: CreateCategoryDto, @Request() req) {
+    return this.categoriesService.create(req.user.id, req.workspace.id, dto)
+  }
 
-    @Post()
-    create(@Body() dto: CreateCategoryDto, @Request() req) {
-        return this.categoriesService.create(req.user.id, req.workspace.id, dto);
-    }
+  @Patch(':id')
+  @RequireRoles('EDITOR')
+  update(@Param('id') id: string, @Body() dto: UpdateCategoryDto, @Request() req) {
+    return this.categoriesService.update(id, req.user.id, dto)
+  }
 
+  @Get()
+  findAll(@Param('workspaceId') workspaceId: string) {
+    return this.categoriesService.findAll(workspaceId)
+  }
 
-    @Patch(':id')
-    update(@Param('id') id: string, @Body() dto: UpdateCategoryDto, @Request() req) {
-        return this.categoriesService.update(id, req.user.id, dto)
-    }
+  @Get(':id')
+  findOne(@Param('id') id: string, @Request() req) {
+    return this.categoriesService.findOne(id, req.user.id)
+  }
 
-    @Get()
-    findAll(@Request() req, @Param('workspaceId') workspaceId: string) {
-        return this.categoriesService.findAll(workspaceId);
-    }
-
-    @Get(':id')
-    findOne(@Param('id') id: string, @Request() req) {
-        return this.categoriesService.findOne(id, req.user.id);
-    }
-
-    @Delete(':id')
-    remove(@Param('id') id: string, @Request() req) {
-        return this.categoriesService.remove(id, req.user.id);
-    }
+  @Delete(':id')
+  @RequireRoles('EDITOR')
+  remove(@Param('id') id: string, @Request() req) {
+    return this.categoriesService.remove(id, req.user.id)
+  }
 }

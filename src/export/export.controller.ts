@@ -2,15 +2,16 @@ import { Controller, Get, Query, Request, UseGuards, Res } from '@nestjs/common'
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { WorkspaceGuard } from '../workspaces/workspace.guard';
+import { RolesGuard, RequireRoles } from '../workspaces/roles.guard';
 import { ExportService } from './export.service';
 
-
 @Controller('w/:workspaceId/export')
-@UseGuards(JwtAuthGuard, WorkspaceGuard)
+@UseGuards(JwtAuthGuard, WorkspaceGuard, RolesGuard)
 export class ExportController {
   constructor(private readonly exportService: ExportService) {}
 
   @Get()
+  @RequireRoles('EDITOR')
   async exportCsv(
     @Request() req,
     @Query('type') type: 'all' | 'expenses' | 'income' = 'all',
