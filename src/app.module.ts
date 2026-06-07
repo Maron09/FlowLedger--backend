@@ -11,6 +11,7 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { UsersModule } from './users/users.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 import { ExportModule } from './export/export.module';
+import { AiModule } from './ai/ai.module';
 
 
 @Module({
@@ -27,6 +28,7 @@ import { ExportModule } from './export/export.module';
     UsersModule,
     WorkspacesModule,
     ExportModule,
+    AiModule,
   ],
 })
 export class AppModule {}
