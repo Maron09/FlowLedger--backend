@@ -18,7 +18,7 @@ export class EmailService {
   async sendPasswordReset(email: string, resetUrl: string) {
     await this.client.transactionalEmails.sendTransacEmail({
       to: [{ email }],
-      sender: { name: 'FlowLedger', email: 'flowhq.dev@gmail.com' },
+      sender: { name: 'FlowLedger', email: this.config.get('BREVO_SENDER_EMAIL') },
       subject: 'Reset your FlowLedger password',
       htmlContent: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
@@ -56,7 +56,7 @@ export class EmailService {
 
     await this.client.transactionalEmails.sendTransacEmail({
       to: [{ email }],
-      sender: { name: 'FlowLedger', email: 'flowhq.dev@gmail.com' },
+      sender: { name: 'FlowLedger', email: this.config.get('BREVO_SENDER_EMAIL') },
       subject: isExceeded
         ? `Budget exceeded — ${data.categoryName}`
         : `Budget warning — ${data.categoryName} at ${data.percentage.toFixed(0)}%`,
@@ -88,4 +88,51 @@ export class EmailService {
       `,
     })
   }
+
+  async sendWorkspaceInvite(
+  email: string,
+  data: {
+    inviterName: string
+    workspaceName: string
+    role: string
+    isExistingUser: boolean
+  }
+) {
+  const appUrl = 'https://flow-ledger-frontend-1th9.vercel.app'
+  const roleLabel = data.role.charAt(0) + data.role.slice(1).toLowerCase()
+
+  await this.client.transactionalEmails.sendTransacEmail({
+    to: [{ email }],
+    sender: { name: 'FlowLedger', email: this.config.get('BREVO_SENDER_EMAIL') },
+    subject: `${data.inviterName} invited you to ${data.workspaceName} on FlowLedger`,
+    htmlContent: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+        <h2 style="color: #10b981; margin-bottom: 8px;">FlowLedger</h2>
+        <h3 style="color: #111; margin-bottom: 16px;">You've been invited!</h3>
+        <p style="color: #555; margin-bottom: 8px;">
+          <strong>${data.inviterName}</strong> has invited you to join
+          <strong>${data.workspaceName}</strong> as a <strong>${roleLabel}</strong>.
+        </p>
+        ${data.isExistingUser ? `
+        <p style="color: #555; margin-bottom: 24px;">
+          The workspace has been added to your account. Log in to access it.
+        </p>
+        <a href="${appUrl}" style="background: #10b981; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">
+          Open FlowLedger
+        </a>
+        ` : `
+        <p style="color: #555; margin-bottom: 24px;">
+          Create a FlowLedger account to accept this invitation.
+        </p>
+        <a href="${appUrl}/register" style="background: #10b981; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">
+          Create Account
+        </a>
+        `}
+        <p style="color: #999; font-size: 13px; margin-top: 24px;">
+          If you weren't expecting this invitation, you can ignore this email.
+        </p>
+      </div>
+    `,
+  })
+}
 }
