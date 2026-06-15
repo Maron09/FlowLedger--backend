@@ -38,7 +38,9 @@ export class PortfolioService {
     try {
       const apiKey = process.env.ALPHA_VANTAGE_API_KEY
       const url = `https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${query}&apikey=${apiKey}`
+      console.log('Searching Alpha Vantage:', url)
       const { data } = await firstValueFrom(this.http.get(url))
+      console.log('Alpha Vantage response:', JSON.stringify(data))
       const results = data['bestMatches'] ?? []
       return results.slice(0, 10).map((r: any) => ({
         symbol: r['1. symbol'],
@@ -47,7 +49,8 @@ export class PortfolioService {
         region: r['4. region'],
         currency: r['8. currency'],
       }))
-    } catch {
+    } catch (err) {
+      console.error('Alpha Vantage error:', err)
       return []
     }
   }
