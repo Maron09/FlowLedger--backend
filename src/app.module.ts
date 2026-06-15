@@ -12,6 +12,7 @@ import { UsersModule } from './users/users.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 import { ExportModule } from './export/export.module';
 import { AiModule } from './ai/ai.module';
+import { PortfolioModule } from './portfolio/portfolio.module';
 
 
 @Module({
@@ -29,6 +30,7 @@ import { AiModule } from './ai/ai.module';
     WorkspacesModule,
     ExportModule,
     AiModule,
+    PortfolioModule,
   ],
 })
 export class AppModule {}

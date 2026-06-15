@@ -168,6 +168,7 @@ model Workspace {
   income     Income[]
   budgets    Budget[]
   taxProfile TaxProfile?
+  portfolio Portfolio?
 
   @@unique([name, ownerId])
   @@map("workspaces")
@@ -230,4 +231,40 @@ enum EmploymentType {
   SALARIED
   SELF_EMPLOYED
   MIXED
+}
+
+model Portfolio {
+  id          String     @id @default(cuid())
+  workspaceId String     @unique
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  positions   Position[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Position {
+  id          String   @id @default(cuid())
+  portfolioId String
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  symbol      String
+  name        String
+  exchange    String   // NGX or INTERNATIONAL
+  currency    String   // NGN or USD
+  trades      Trade[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([portfolioId, symbol])
+}
+
+model Trade {
+  id         String   @id @default(cuid())
+  positionId String
+  position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  units      Float
+  pricePerUnit Float
+  totalCost  Float
+  buyDate    DateTime
+  notes      String?
+  createdAt  DateTime @default(now())
 }
