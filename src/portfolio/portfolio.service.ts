@@ -1,14 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from 'prisma/prisma.service'
-import { HttpService } from '@nestjs/axios'
-import { firstValueFrom } from 'rxjs'
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const yahooFinance = require('yahoo-finance2').default
 
 @Injectable()
 export class PortfolioService {
-  constructor(
-    private prisma: PrismaService,
-    private http: HttpService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   private async getOrCreatePortfolio(workspaceId: string) {
     let portfolio = await this.prisma.portfolio.findUnique({
@@ -24,11 +21,8 @@ export class PortfolioService {
 
   private async fetchPrice(symbol: string): Promise<number | null> {
     try {
-      const apiKey = process.env.ALPHA_VANTAGE_API_KEY
-      const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${apiKey}`
-      const { data } = await firstValueFrom(this.http.get(url))
-      const price = parseFloat(data['Global Quote']?.['05. price'])
-      return isNaN(price) ? null : price
+      const quote = await yahooFinance.quote(symbol)
+      return (quote?.regularMarketPrice as number) ?? null
     } catch {
       return null
     }
@@ -36,21 +30,20 @@ export class PortfolioService {
 
   async searchSymbol(query: string) {
     try {
-      const apiKey = process.env.ALPHA_VANTAGE_API_KEY
-      const url = `https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${query}&apikey=${apiKey}`
-      console.log('Searching Alpha Vantage:', url)
-      const { data } = await firstValueFrom(this.http.get(url))
-      console.log('Alpha Vantage response:', JSON.stringify(data))
-      const results = data['bestMatches'] ?? []
-      return results.slice(0, 10).map((r: any) => ({
-        symbol: r['1. symbol'],
-        name: r['2. name'],
-        type: r['3. type'],
-        region: r['4. region'],
-        currency: r['8. currency'],
-      }))
+      const results = await yahooFinance.search(query)
+      const quotes = (results?.quotes ?? []) as any[]
+      return quotes
+        .filter((r: any) => r.quoteType === 'EQUITY' || r.quoteType === 'ETF')
+        .slice(0, 10)
+        .map((r: any) => ({
+          symbol: r.symbol,
+          name: r.longname ?? r.shortname ?? r.symbol,
+          type: r.quoteType,
+          region: r.exchDisp ?? r.exchange ?? '',
+          currency: r.currency ?? 'USD',
+        }))
     } catch (err) {
-      console.error('Alpha Vantage error:', err)
+      console.error('Yahoo Finance search error:', err)
       return []
     }
   }
@@ -70,7 +63,6 @@ export class PortfolioService {
         const avgCost = totalUnits > 0 ? totalCost / totalUnits : 0
 
         const currentPrice = await this.fetchPrice(pos.symbol)
-
         const currentValue = currentPrice ? currentPrice * totalUnits : null
         const gainLoss = currentValue ? currentValue - totalCost : null
         const gainLossPct = gainLoss && totalCost > 0 ? (gainLoss / totalCost) * 100 : null
@@ -95,7 +87,6 @@ export class PortfolioService {
       })
     )
 
-    // Portfolio totals by currency
     const ngnPositions = positionsWithStats.filter(p => p.currency === 'NGN')
     const usdPositions = positionsWithStats.filter(p => p.currency === 'USD')
 
@@ -167,7 +158,6 @@ export class PortfolioService {
   }) {
     const portfolio = await this.getOrCreatePortfolio(workspaceId)
 
-    // Get or create position
     let position = await this.prisma.position.findUnique({
       where: { portfolioId_symbol: { portfolioId: portfolio.id, symbol: dto.symbol } },
     })
@@ -213,7 +203,6 @@ export class PortfolioService {
 
     await this.prisma.trade.delete({ where: { id: tradeId } })
 
-    // Clean up position if no trades left
     const remaining = await this.prisma.trade.count({
       where: { positionId: trade.positionId },
     })
