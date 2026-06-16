@@ -1,8 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from 'prisma/prisma.service'
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const yahooFinance = require('yahoo-finance2').default
-
+import YahooFinance from 'yahoo-finance2'
+const yahooFinance = new YahooFinance()
 @Injectable()
 export class PortfolioService {
   constructor(private prisma: PrismaService) {}
