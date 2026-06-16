@@ -28,24 +28,24 @@ export class PortfolioService {
   }
 
   async searchSymbol(query: string) {
-    try {
-      const results = await yahooFinance.search(query)
-      const quotes = (results?.quotes ?? []) as any[]
-      return quotes
-        .filter((r: any) => r.quoteType === 'EQUITY' || r.quoteType === 'ETF')
-        .slice(0, 10)
-        .map((r: any) => ({
-          symbol: r.symbol,
-          name: r.longname ?? r.shortname ?? r.symbol,
-          type: r.quoteType,
-          region: r.exchDisp ?? r.exchange ?? '',
-          currency: r.currency ?? 'USD',
-        }))
-    } catch (err) {
-      console.error('Yahoo Finance search error:', err)
-      return []
-    }
+  try {
+    const results = await yahooFinance.search(query)
+    const quotes = (results?.quotes ?? []) as any[]
+    console.log('All quotes:', JSON.stringify(quotes))
+    return quotes
+      .slice(0, 10)
+      .map((r: any) => ({
+        symbol: r.symbol,
+        name: r.longname ?? r.shortname ?? r.symbol,
+        type: r.quoteType,
+        region: r.exchDisp ?? r.exchange ?? '',
+        currency: r.currency ?? 'USD',
+      }))
+  } catch (err) {
+    console.error('Yahoo Finance search error:', err)
+    return []
   }
+}
 
   async getPortfolio(workspaceId: string) {
     const portfolio = await this.getOrCreatePortfolio(workspaceId)
