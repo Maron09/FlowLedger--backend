@@ -2,7 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from 'prisma/prisma.service'
 import { NgxScraperService } from './ngx-scrapper.service'
 
-const yahooFinance = new(require('yahoo-finance2').YahooFinance)()
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const yahooFinance = require('yahoo-finance2').default
 @Injectable()
 export class PortfolioService {
   constructor(private prisma: PrismaService, private ngxScraper: NgxScraperService) {}
@@ -36,7 +37,6 @@ export class PortfolioService {
   if (exchange === 'NGX') {
     return this.ngxScraper.searchNGX(query)
   }
-
   try {
     const results = await yahooFinance.search(query)
     const quotes = (results?.quotes ?? []) as any[]
