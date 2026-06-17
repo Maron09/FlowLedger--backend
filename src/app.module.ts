@@ -13,6 +13,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
 import { ExportModule } from './export/export.module';
 import { AiModule } from './ai/ai.module';
 import { PortfolioModule } from './portfolio/portfolio.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 
 @Module({
@@ -31,6 +32,7 @@ import { PortfolioModule } from './portfolio/portfolio.module';
     ExportModule,
     AiModule,
     PortfolioModule,
+    ScheduleModule.forRoot(),
   ],
 })
 export class AppModule {}

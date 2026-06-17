@@ -16,9 +16,12 @@ export class PortfolioController {
   }
 
   @Get('search')
-  searchSymbol(@Query('q') query: string) {
-    return this.portfolioService.searchSymbol(query)
-  }
+searchSymbol(
+  @Query('q') query: string,
+  @Query('exchange') exchange: string = 'INTERNATIONAL',
+) {
+  return this.portfolioService.searchSymbol(query, exchange)
+}
 
   @Get(':symbol')
   getPosition(

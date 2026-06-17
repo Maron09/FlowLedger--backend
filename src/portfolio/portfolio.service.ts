@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from 'prisma/prisma.service'
-import YahooFinance from 'yahoo-finance2'
-const yahooFinance = new YahooFinance()
+import { NgxScraperService } from './ngx-scrapper.service'
+
+const yahooFinance = require('yahoo-finance2').default
 @Injectable()
 export class PortfolioService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private ngxScraper: NgxScraperService) {}
 
   private async getOrCreatePortfolio(workspaceId: string) {
     let portfolio = await this.prisma.portfolio.findUnique({
@@ -18,8 +19,12 @@ export class PortfolioService {
     return portfolio
   }
 
-  private async fetchPrice(symbol: string): Promise<number | null> {
+  private async fetchPrice(symbol: string, currency: string): Promise<number | null> {
     try {
+      if (currency === 'NGN') {
+        return await this.ngxScraper.getNGXPrice(symbol)
+      }
+      const yahooFinance = new (require('yahoo-finance2').YahooFinance)()
       const quote = await yahooFinance.quote(symbol)
       return (quote?.regularMarketPrice as number) ?? null
     } catch {
@@ -27,25 +32,31 @@ export class PortfolioService {
     }
   }
 
-  async searchSymbol(query: string) {
-  try {
-    const results = await yahooFinance.search(query)
-    const quotes = (results?.quotes ?? []) as any[]
-    console.log('All quotes:', JSON.stringify(quotes))
-    return quotes
-      .slice(0, 10)
-      .map((r: any) => ({
-        symbol: r.symbol,
-        name: r.longname ?? r.shortname ?? r.symbol,
-        type: r.quoteType,
-        region: r.exchDisp ?? r.exchange ?? '',
-        currency: r.currency ?? 'USD',
-      }))
-  } catch (err) {
-    console.error('Yahoo Finance search error:', err)
-    return []
+
+  async searchSymbol(query: string, exchange: string) {
+    if (exchange === 'NGX') {
+      return this.ngxScraper.searchNGX(query)
+    }
+
+    try {
+      const yf = new (require('yahoo-finance2').YahooFinance)()
+      const results = await yf.search(query)
+      const quotes = (results?.quotes ?? []) as any[]
+      return quotes
+        .filter((r: any) => r.quoteType === 'EQUITY' || r.quoteType === 'ETF')
+        .slice(0, 10)
+        .map((r: any) => ({
+          symbol: r.symbol,
+          name: r.longname ?? r.shortname ?? r.symbol,
+          type: r.quoteType,
+          region: r.exchDisp ?? r.exchange ?? '',
+          currency: r.currency ?? 'USD',
+        }))
+    } catch (err) {
+      console.error('Yahoo Finance search error:', err)
+      return []
+    }
   }
-}
 
   async getPortfolio(workspaceId: string) {
     const portfolio = await this.getOrCreatePortfolio(workspaceId)
@@ -61,7 +72,7 @@ export class PortfolioService {
         const totalCost = pos.trades.reduce((sum, t) => sum + t.totalCost, 0)
         const avgCost = totalUnits > 0 ? totalCost / totalUnits : 0
 
-        const currentPrice = await this.fetchPrice(pos.symbol)
+        const currentPrice = await this.fetchPrice(pos.symbol, pos.currency)
         const currentValue = currentPrice ? currentPrice * totalUnits : null
         const gainLoss = currentValue ? currentValue - totalCost : null
         const gainLossPct = gainLoss && totalCost > 0 ? (gainLoss / totalCost) * 100 : null
@@ -128,7 +139,7 @@ export class PortfolioService {
     const totalUnits = position.trades.reduce((sum, t) => sum + t.units, 0)
     const totalCost = position.trades.reduce((sum, t) => sum + t.totalCost, 0)
     const avgCost = totalUnits > 0 ? totalCost / totalUnits : 0
-    const currentPrice = await this.fetchPrice(symbol)
+    const currentPrice = await this.fetchPrice(symbol, position.currency)
     const currentValue = currentPrice ? currentPrice * totalUnits : null
     const gainLoss = currentValue ? currentValue - totalCost : null
     const gainLossPct = gainLoss && totalCost > 0 ? (gainLoss / totalCost) * 100 : null
