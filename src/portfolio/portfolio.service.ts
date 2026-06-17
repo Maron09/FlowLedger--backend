@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from 'prisma/prisma.service'
 import { NgxScraperService } from './ngx-scrapper.service'
 
-const yahooFinance = require('yahoo-finance2').default
+const yahooFinance = new(require('yahoo-finance2').YahooFinance)()
 @Injectable()
 export class PortfolioService {
   constructor(private prisma: PrismaService, private ngxScraper: NgxScraperService) {}
@@ -20,43 +20,41 @@ export class PortfolioService {
   }
 
   private async fetchPrice(symbol: string, currency: string): Promise<number | null> {
-    try {
-      if (currency === 'NGN') {
-        return await this.ngxScraper.getNGXPrice(symbol)
-      }
-      const yahooFinance = new (require('yahoo-finance2').YahooFinance)()
-      const quote = await yahooFinance.quote(symbol)
-      return (quote?.regularMarketPrice as number) ?? null
-    } catch {
-      return null
+  try {
+    if (currency === 'NGN') {
+      return await this.ngxScraper.getNGXPrice(symbol)
     }
+    const quote = await yahooFinance.quote(symbol)
+    return (quote?.regularMarketPrice as number) ?? null
+  } catch {
+    return null
   }
+}
 
 
   async searchSymbol(query: string, exchange: string) {
-    if (exchange === 'NGX') {
-      return this.ngxScraper.searchNGX(query)
-    }
-
-    try {
-      const yf = new (require('yahoo-finance2').YahooFinance)()
-      const results = await yf.search(query)
-      const quotes = (results?.quotes ?? []) as any[]
-      return quotes
-        .filter((r: any) => r.quoteType === 'EQUITY' || r.quoteType === 'ETF')
-        .slice(0, 10)
-        .map((r: any) => ({
-          symbol: r.symbol,
-          name: r.longname ?? r.shortname ?? r.symbol,
-          type: r.quoteType,
-          region: r.exchDisp ?? r.exchange ?? '',
-          currency: r.currency ?? 'USD',
-        }))
-    } catch (err) {
-      console.error('Yahoo Finance search error:', err)
-      return []
-    }
+  if (exchange === 'NGX') {
+    return this.ngxScraper.searchNGX(query)
   }
+
+  try {
+    const results = await yahooFinance.search(query)
+    const quotes = (results?.quotes ?? []) as any[]
+    return quotes
+      .filter((r: any) => r.quoteType === 'EQUITY' || r.quoteType === 'ETF')
+      .slice(0, 10)
+      .map((r: any) => ({
+        symbol: r.symbol,
+        name: r.longname ?? r.shortname ?? r.symbol,
+        type: r.quoteType,
+        region: r.exchDisp ?? r.exchange ?? '',
+        currency: r.currency ?? 'USD',
+      }))
+  } catch (err) {
+    console.error('Yahoo Finance search error:', err)
+    return []
+  }
+}
 
   async getPortfolio(workspaceId: string) {
     const portfolio = await this.getOrCreatePortfolio(workspaceId)
