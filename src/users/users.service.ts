@@ -1,8 +1,10 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { PrismaService } from 'prisma/prisma.service';
-import { UpdateProfileDto } from './dto/update-profile.dto';
-import { ChangePasswordDto } from './dto/change-password.dto';
-import * as bcrypt from 'bcrypt';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
+import { PrismaService } from 'prisma/prisma.service'
+import { UpdateProfileDto } from './dto/update-profile.dto'
+import { ChangePasswordDto } from './dto/change-password.dto'
+import { PushTokenDto } from './dto/push-token.dto'
+import * as bcrypt from 'bcrypt'
+
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
@@ -19,7 +21,7 @@ export class UsersService {
         createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
-    });
+    })
   }
 
   async findById(id: string) {
@@ -33,7 +35,7 @@ export class UsersService {
         currency: true,
         role: true,
       },
-    });
+    })
   }
 
   async updateProfile(id: string, dto: UpdateProfileDto) {
@@ -42,7 +44,6 @@ export class UsersService {
       data: {
         firstName: dto.firstName,
         lastName: dto.lastName,
-        // currency: dto.currency, // Uncomment if you want to allow updating currency
       },
       select: {
         id: true,
@@ -52,24 +53,30 @@ export class UsersService {
         currency: true,
         role: true,
       },
-    });
+    })
   }
 
   async changePassword(id: string, dto: ChangePasswordDto) {
-    const user = await this.prisma.user.findUnique({ where: { id } });
-    if (!user) throw new NotFoundException('User not found');
+    const user = await this.prisma.user.findUnique({ where: { id } })
+    if (!user) throw new NotFoundException('User not found')
 
-    const valid = await bcrypt.compare(dto.currentPassword, user.passwordHash);
-    if (!valid) throw new UnauthorizedException('Current password is incorrect');
+    const valid = await bcrypt.compare(dto.currentPassword, user.passwordHash)
+    if (!valid) throw new UnauthorizedException('Current password is incorrect')
 
-    const passwordHash = await bcrypt.hash(dto.newPassword, 12);
+    const passwordHash = await bcrypt.hash(dto.newPassword, 12)
+    await this.prisma.user.update({ where: { id }, data: { passwordHash } })
 
-    await this.prisma.user.update({
-      where: { id },
-      data: { passwordHash },
-    });
-
-    return { message: 'Password updated successfully' };
+    return { message: 'Password updated successfully' }
   }
 
+  async savePushToken(id: string, dto: PushTokenDto) {
+    await this.prisma.user.update({
+      where: { id },
+      data: {
+        pushToken: dto.token,
+        pushPlatform: dto.platform,
+      },
+    })
+    return { success: true }
+  }
 }

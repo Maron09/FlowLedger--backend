@@ -14,6 +14,7 @@ import { ExportModule } from './export/export.module';
 import { AiModule } from './ai/ai.module';
 import { PortfolioModule } from './portfolio/portfolio.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { NotificationsModule } from './notifications/notifications.module';
 
 
 @Module({
@@ -33,6 +34,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     AiModule,
     PortfolioModule,
     ScheduleModule.forRoot(),
+    NotificationsModule,
   ],
 })
 export class AppModule {}

@@ -4,12 +4,14 @@ import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
 import { QueryExpensesDto } from './dto/query-expense.dto';
 import { EmailService } from '../auth/email.service';
+import { NotificationsService } from '../notifications/notifications.service'
 
 @Injectable()
 export class ExpensesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(userId: string, workspaceId: string, dto: CreateExpenseDto) {
@@ -90,6 +92,12 @@ export class ExpensesService {
         status,
         workspaceName: workspace.name,
       })
+      await this.notificationsService.sendBudgetAlert(
+        userId,
+        budget.category.name,
+        percentage,
+        percentage >= 100 ? 'over' : 'warning',
+      )
       await this.prisma.budget.update({
         where: { id: budget.id },
         data: { lastAlertAt: new Date(), lastAlertType: status },

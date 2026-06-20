@@ -18,6 +18,8 @@ model User {
   lastWorkspaceId String?  @map("last_workspace_id")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
+  pushToken  String?
+  pushPlatform String?
 
   categories       Category[]
   expenses         Expense[]
